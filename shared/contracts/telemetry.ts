@@ -1,5 +1,7 @@
-export type TelemetryContract = {
-  eventType: string;
-  payload: Record<string, unknown>;
+export type TelemetryEvent = {
+  sessionId: string;
   timestamp: number;
+  eventType: string;
+  elementId: string;
+  metadata: Record<string, unknown>;
 };
