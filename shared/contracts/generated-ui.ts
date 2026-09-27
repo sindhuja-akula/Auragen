@@ -1,5 +1,6 @@
 export type GeneratedUI = {
+  code: string;
   componentName: string;
-  props?: Record<string, unknown>;
-  children?: GeneratedUI[];
+  dependencies: string[];
+  metadata: Record<string, unknown>;
 };
