@@ -1,15 +1,19 @@
-export type TelemetryEvent = {
-  type: string;
-  payload: Record<string, unknown>;
-  timestamp: number;
-};
+import type { TelemetryEvent } from '../../shared/contracts/telemetry.js';
 
 export class TelemetryCollector {
-  collect(eventType: string, payload: Record<string, unknown> = {}): TelemetryEvent {
+  constructor(private readonly sessionId = 'test-session') {}
+
+  collect(
+    eventType: string,
+    elementId: string,
+    metadata: Record<string, unknown> = {},
+  ): TelemetryEvent {
     return {
-      type: eventType,
-      payload,
+      sessionId: this.sessionId,
       timestamp: Date.now(),
+      eventType,
+      elementId,
+      metadata,
     };
   }
 }
