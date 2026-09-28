@@ -1,64 +1,88 @@
 import type { TelemetryEvent } from '../../shared/contracts/telemetry.js';
-import type { ClientMessage, ServerMessage, WebSocketMessage } from '../../shared/contracts/websocket.js';
+import type {
+  ClientMessage,
+  ServerMessage,
+  WebSocketMessage,
+} from '../../shared/contracts/websocket.js';
 import { TelemetryCollector } from './collector.js';
+import { getSessionId } from './session.js';
+
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+
+type ServerMessageHandler = (message: ServerMessage) => void;
+type StatusHandler = (status: ConnectionStatus) => void;
+
+const SERVER_MESSAGE_TYPES = ['redesign_started', 'redesign_result', 'redesign_failed'];
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 15000;
 
 export function createTelemetryMessage(event: TelemetryEvent): ClientMessage {
   return { type: 'telemetry', payload: event };
 }
 
-type ServerMessageHandler = (message: ServerMessage) => void;
-
 export class TelemetryWebSocketClient {
   private socket?: WebSocket;
-  private readonly collector = new TelemetryCollector();
-  private readonly messageHandlers: ServerMessageHandler[] = [];
-  private readonly connectionHandlers: Array<(connected: boolean) => void> = [];
-  private reconnectTimer?: ReturnType<typeof setTimeout>;
   private url?: string;
-  private shouldReconnect = false;
+  private status: ConnectionStatus = 'disconnected';
+  private closedByUser = false;
+  private reconnectAttempts = 0;
+  private reconnectTimer?: ReturnType<typeof setTimeout>;
+  private readonly collector = new TelemetryCollector(getSessionId());
+  private readonly messageHandlers: ServerMessageHandler[] = [];
+  private readonly statusHandlers: StatusHandler[] = [];
 
   connect(url: string): void {
     this.url = url;
-    this.shouldReconnect = true;
-    this.openSocket();
+    this.closedByUser = false;
+    this.open();
   }
 
-  private openSocket(): void {
-    if (!this.url || !this.shouldReconnect) return;
+  private open(): void {
+    if (!this.url) return;
+    this.setStatus('connecting');
 
-    const socket = new WebSocket(this.url);
+    let socket: WebSocket;
+    try {
+      socket = new WebSocket(this.url);
+    } catch (err) {
+      console.error('[WS] Could not create socket', err);
+      this.setStatus('disconnected');
+      this.scheduleReconnect();
+      return;
+    }
     this.socket = socket;
+
     socket.addEventListener('open', () => {
-      if (this.socket === socket) this.notifyConnectionChange(true);
-      console.log('[WS] Connected');
+      this.reconnectAttempts = 0;
+      this.setStatus('connected');
     });
-    socket.addEventListener('error', (event) => console.error('[WS] Connection error', event));
+
+    socket.addEventListener('message', (event) => this.handleIncoming(event));
+    socket.addEventListener('error', () => {
+      console.warn('[WS] Connection error');
+    });
+
     socket.addEventListener('close', () => {
-      console.log('[WS] Connection closed');
       if (this.socket === socket) {
         this.socket = undefined;
-        this.notifyConnectionChange(false);
+      }
+      this.setStatus('disconnected');
+      if (!this.closedByUser) {
         this.scheduleReconnect();
       }
     });
-    socket.addEventListener('message', (event) => this.handleIncoming(event));
   }
 
   private scheduleReconnect(): void {
-    if (!this.shouldReconnect || this.reconnectTimer !== undefined) return;
+    if (this.reconnectTimer) return;
+
+    const delay = Math.min(RECONNECT_BASE_MS * 2 ** this.reconnectAttempts, RECONNECT_MAX_MS);
+    this.reconnectAttempts += 1;
+
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = undefined;
-      this.openSocket();
-    }, 1000);
-  }
-
-  private notifyConnectionChange(connected: boolean): void {
-    this.connectionHandlers.forEach((handler) => handler(connected));
-  }
-
-  onConnectionChange(handler: (connected: boolean) => void): void {
-    this.connectionHandlers.push(handler);
-    handler(this.socket?.readyState === WebSocket.OPEN);
+      this.open();
+    }, delay);
   }
 
   private handleIncoming(event: MessageEvent): void {
@@ -66,22 +90,35 @@ export class TelemetryWebSocketClient {
     try {
       parsed = JSON.parse(event.data);
     } catch (err) {
-      console.warn('[WS] Received malformed message, ignoring', err);
+      console.warn('[WS] Malformed message ignored', err);
       return;
     }
 
-    const knownTypes = ['redesign_started', 'redesign_result', 'redesign_failed'];
-    if (!knownTypes.includes(parsed.type)) {
-      console.warn('[WS] Unknown server message type, ignoring:', parsed.type);
+    if (!parsed || typeof parsed.type !== 'string' || !SERVER_MESSAGE_TYPES.includes(parsed.type)) {
+      console.debug('[WS] Message type not handled by frontend, ignoring:', parsed?.type);
       return;
     }
 
-    const serverMessage = parsed as ServerMessage;
-    this.messageHandlers.forEach((handler) => handler(serverMessage));
+    const message = parsed as ServerMessage;
+    this.messageHandlers.forEach((handler) => handler(message));
+  }
+
+  private setStatus(next: ConnectionStatus): void {
+    if (this.status === next) return;
+    this.status = next;
+    this.statusHandlers.forEach((handler) => handler(next));
   }
 
   onServerMessage(handler: ServerMessageHandler): void {
     this.messageHandlers.push(handler);
+  }
+
+  onStatusChange(handler: StatusHandler): void {
+    this.statusHandlers.push(handler);
+  }
+
+  getStatus(): ConnectionStatus {
+    return this.status;
   }
 
   send(event: TelemetryEvent): boolean {
@@ -98,14 +135,13 @@ export class TelemetryWebSocketClient {
   }
 
   close(): void {
-    this.shouldReconnect = false;
-    if (this.reconnectTimer !== undefined) {
+    this.closedByUser = true;
+    if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
     }
     const socket = this.socket;
     this.socket = undefined;
     socket?.close();
-    this.notifyConnectionChange(false);
   }
 }

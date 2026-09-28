@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { DomTelemetryTracker } from './telemetry/domTracking.js';
-import { TelemetryWebSocketClient } from './telemetry/websocketClient.js';
+import {
+  TelemetryWebSocketClient,
+  type ConnectionStatus,
+} from './telemetry/websocketClient.js';
+import { WS_URL } from './telemetry/config.js';
 import { createAdaptationHandler } from './renderer/adaptationHandler.js';
 import { StateManager } from './state/stateManager.js';
 import { DynamicRenderer } from './renderer/DynamicRenderer.js';
 
-// TODO: replace with the real orchestrator URL once Member 1 shares it
-const WEBSOCKET_URL = import.meta.env.VITE_WS_URL ?? 'ws://127.0.0.1:3001';
-
 export function AdaptiveForm() {
   const [generatedTree, setGeneratedTree] = useState<unknown>(null);
   const [isAdapting, setIsAdapting] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
+  const [status, setStatus] = useState<ConnectionStatus>('connecting');
 
   const nameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
@@ -22,7 +23,6 @@ export function AdaptiveForm() {
     const client = new TelemetryWebSocketClient();
     const stateManager = new StateManager();
     const tracker = new DomTelemetryTracker(client);
-    client.onConnectionChange(setIsConnected);
 
     const handleAdaptation = createAdaptationHandler(stateManager, {
       onStarted: () => setIsAdapting(true),
@@ -31,19 +31,27 @@ export function AdaptiveForm() {
         setGeneratedTree(tree);
       },
       onFailed: () => {
+        // per contract: keep the current UI as it is
         setIsAdapting(false);
       },
     });
 
     client.onServerMessage(handleAdaptation);
-    client.connect(WEBSOCKET_URL);
+    client.onStatusChange(setStatus);
+    client.connect(WS_URL);
 
+    const detachers: Array<() => void> = [];
     [nameRef, emailRef, phoneRef].forEach((ref) => {
-      if (ref.current) tracker.attach(ref.current);
+      if (ref.current) detachers.push(tracker.attach(ref.current));
     });
-    if (submitRef.current) tracker.attachClick(submitRef.current, 'submit-button');
+    if (submitRef.current) {
+      detachers.push(tracker.attachClickTracking(submitRef.current));
+    }
 
-    return () => client.close();
+    return () => {
+      detachers.forEach((detach) => detach());
+      client.close();
+    };
   }, []);
 
   if (generatedTree) {
@@ -53,7 +61,14 @@ export function AdaptiveForm() {
   return (
     <form onSubmit={(e) => e.preventDefault()}>
       <h2>AuraGen Demo Form</h2>
-      <p role="status">{isConnected ? 'Connected' : 'Disconnected. Reconnecting...'}</p>
+
+      {status !== 'connected' && (
+        <p style={{ fontSize: 12, color: '#888', margin: '0 0 16px' }}>
+          {status === 'connecting'
+            ? 'Connecting...'
+            : 'Live adaptation is offline. The form still works normally.'}
+        </p>
+      )}
       {isAdapting && <p>Adjusting the form for you...</p>}
 
       <div>
@@ -78,7 +93,9 @@ export function AdaptiveForm() {
         />
       </div>
 
-      <button ref={submitRef} type="submit">Submit</button>
+      <button ref={submitRef} id="submit-button" type="submit">
+        Submit
+      </button>
     </form>
   );
 }
