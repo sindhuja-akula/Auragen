@@ -30,3 +30,7 @@ D25	Renderer responsibility	Render validated UI only	Renderer should not become 
 D26	Telemetry responsibility	Capture meaningful signals only	We don't need to send every possible user action.
 D27	Team integration	Progressive integration, not isolated mini-projects	Every layer must eventually work with the others.
 D28	Team Lead responsibility	Architecture + contracts + orchestration + integration + failure handling	Your role is to make the system work as one system, not to code every layer.
+D29	Telemetry pipeline	WebSocket validates and forwards; a separate pipeline scores bounded per-session history and calls the Orchestrator	Transport remains decision-free while telemetry reaches cognitive policy.
+D30	Generator boundary	Pass the shared RedesignRequest directly to the generation port	Generation implementations must adapt to the shared contract, not the reverse.
+D31	Unvalidated output	Do not send generated content to the frontend until AST/security validation is implemented and connected	The current validator is a stub and must not authorize rendering.
+D32	Async generation lock	Keep the in-flight lock until the generation promise settles; retain current state while concurrent evidence is observed	Prevents overlapping generation while allowing later score reevaluation.
