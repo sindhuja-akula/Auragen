@@ -4,6 +4,9 @@ export type ValidationIssue = {
 };
 
 export type ValidationResult = {
-  ok: boolean;
-  issues: ValidationIssue[];
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  issues?: ValidationIssue[];
+  ok?: boolean;
 };

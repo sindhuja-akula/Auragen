@@ -3,5 +3,10 @@ export type DynamicRendererProps = {
 };
 
 export function DynamicRenderer({ tree }: DynamicRendererProps) {
-  return <div data-render-tree={JSON.stringify(tree)} />;
+  return {
+    type: 'div',
+    props: {
+      'data-render-tree': JSON.stringify(tree),
+    },
+  };
 }

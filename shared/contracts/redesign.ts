@@ -1,4 +1,7 @@
 export type RedesignRequest = {
-  originalUI: Record<string, unknown>;
-  telemetry: Record<string, unknown>;
+  sessionId: string;
+  currentUI: Record<string, unknown>;
+  cognitiveSignals: string[];
+  currentState: Record<string, unknown>;
+  allowedComponents: string[];
 };
