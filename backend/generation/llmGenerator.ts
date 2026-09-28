@@ -1,13 +1,10 @@
-export type GenerationRequest = {
-  prompt: string;
-  context?: Record<string, unknown>;
-};
+import type { RedesignRequest } from '../../shared/contracts/redesign.js';
 
 export class LLMGenerator {
-  generate(request: GenerationRequest) {
+  generate(request: RedesignRequest) {
     return {
-      prompt: request.prompt,
-      context: request.context ?? {},
+      signals: request.cognitiveSignals,
+      context: request,
       generated: 'placeholder-ui',
     };
   }

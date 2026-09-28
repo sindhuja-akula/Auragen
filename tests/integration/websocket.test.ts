@@ -47,10 +47,12 @@ describe('WebSocket telemetry communication', () => {
   let logger: TestLogger;
   let url: string;
   let client: WebSocket | undefined;
+  let onTelemetry: (event: TelemetryEvent) => void;
 
   beforeEach(async () => {
     logger = new TestLogger();
-    server = new WebSocketServer(logger);
+    onTelemetry = () => undefined;
+    server = new WebSocketServer(logger, (event) => onTelemetry(event));
     url = await server.start({ port: 0 });
   });
 
@@ -84,6 +86,21 @@ describe('WebSocket telemetry communication', () => {
 
     await logger.waitFor('[WS] Received telemetry');
     expect(socket.readyState).toBe(WebSocket.OPEN);
+  });
+
+  it('passes validated telemetry to the cognitive pipeline handler', async () => {
+    const received: TelemetryEvent[] = [];
+    onTelemetry = (event) => received.push(event);
+    const socket = await connect();
+    sendValidTelemetry(socket);
+
+    await logger.waitFor('[WS] Received telemetry');
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({
+      sessionId: 'test-session',
+      eventType: 'click',
+      elementId: 'submit-button',
+    });
   });
 
   it('rejects telemetry missing sessionId', async () => {

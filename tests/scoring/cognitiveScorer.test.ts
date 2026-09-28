@@ -41,6 +41,22 @@ describe('cognitive scorer', () => {
     expect(result.signals).toContain('hesitation');
   });
 
+  it('recognizes the behavioral event types emitted by the frontend', () => {
+    const events = [
+      makeEvent('repeated_click', 'submit-button', { count: 3 }),
+      makeEvent('long_hesitation', 'email', { value: 9000 }),
+      makeEvent('backtracking', 'email', { value: 3 }),
+      makeEvent('failed_attempt', 'phone', { value: 2 }),
+    ];
+
+    const result = scoreCognitiveLoad(events);
+
+    expect(result.score).toBeGreaterThanOrEqual(result.threshold);
+    expect(result.signals).toEqual(
+      expect.arrayContaining(['repeated_clicks', 'hesitation', 'backtracking', 'failed_attempts']),
+    );
+  });
+
   it('uses the provided threshold for boundary logic', () => {
     const result = scoreCognitiveLoad([], 0.5);
     expect(result.threshold).toBe(0.5);

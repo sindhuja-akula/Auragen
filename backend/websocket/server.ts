@@ -2,6 +2,8 @@ import { createServer, type Server as HttpServer } from 'node:http';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer as WsServer, type RawData } from 'ws';
+import type { TelemetryEvent } from '../../shared/contracts/telemetry.js';
+import { TelemetryPipeline } from '../orchestrator/telemetryPipeline.js';
 import { isTelemetryEvent, parseClientMessage } from './messages.js';
 
 export type WebSocketServerOptions = {
@@ -9,11 +11,16 @@ export type WebSocketServerOptions = {
   port?: number;
 };
 
+export type TelemetryHandler = (event: TelemetryEvent) => void | Promise<void>;
+
 export class WebSocketServer {
   private httpServer?: HttpServer;
   private websocketServer?: WsServer;
 
-  constructor(private readonly logger: Pick<Console, 'log' | 'error'> = console) {}
+  constructor(
+    private readonly logger: Pick<Console, 'log' | 'error'> = console,
+    private readonly onTelemetry?: TelemetryHandler,
+  ) {}
 
   start({ host = '127.0.0.1', port = 3001 }: WebSocketServerOptions = {}): Promise<string> {
     if (this.httpServer) {
@@ -27,7 +34,9 @@ export class WebSocketServer {
 
     websocketServer.on('connection', (socket) => {
       this.logger.log('[WS] Client connected');
-      socket.on('message', (data: RawData) => this.handleMessage(data));
+      socket.on('message', (data: RawData) => {
+        void this.handleMessage(data);
+      });
       socket.on('close', () => this.logger.log('[WS] Client disconnected'));
       socket.on('error', (error) => this.logger.error('[WS] Client error', error));
     });
@@ -74,7 +83,7 @@ export class WebSocketServer {
     });
   }
 
-  private handleMessage(data: RawData): void {
+  private async handleMessage(data: RawData): Promise<void> {
     const parsed = parseClientMessage(data.toString());
     if (!parsed.ok) {
       this.logger.error(`[WS] Invalid message: ${parsed.reason}`);
@@ -91,12 +100,21 @@ export class WebSocketServer {
       return;
     }
 
-    this.logger.log('[WS] Received telemetry', parsed.message.payload);
+    const event = parsed.message.payload;
+    this.logger.log('[WS] Received telemetry', event);
+    try {
+      await this.onTelemetry?.(event);
+    } catch (error) {
+      this.logger.error('[WS] Telemetry processing failed', error);
+    }
   }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const server = new WebSocketServer();
+  const pipeline = new TelemetryPipeline();
+  const server = new WebSocketServer(console, async (event) => {
+    await pipeline.process(event);
+  });
   server.start({ host: '127.0.0.1' }).then((url) => {
     console.log(`[WS] Listening at ${url}`);
   }).catch((error: unknown) => {

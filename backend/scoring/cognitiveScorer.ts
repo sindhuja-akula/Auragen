@@ -34,17 +34,37 @@ export function scoreCognitiveLoad(
     const key = `${event.eventType}:${event.elementId}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
 
+    const eventType = event.eventType.toLowerCase();
     const metadata = event.metadata as Record<string, unknown>;
-    if (metadata.hesitation === true || metadata.delayMs !== undefined && Number(metadata.delayMs) > 2000) {
+    if (
+      eventType === 'long_hesitation' ||
+      eventType === 'hesitation' ||
+      metadata.hesitation === true ||
+      metadata.delayMs !== undefined && Number(metadata.delayMs) > 2000
+    ) {
       signals.add('hesitation');
     }
-    if (metadata.repeated === true || metadata.attempt !== undefined && Number(metadata.attempt) > 1) {
+    if (
+      eventType === 'repeated_click' ||
+      eventType === 'repeated_clicks' ||
+      metadata.repeated === true ||
+      metadata.attempt !== undefined && Number(metadata.attempt) > 1
+    ) {
       signals.add('repeated_clicks');
     }
-    if (event.elementId.toLowerCase().includes('back') || metadata.backtracking === true) {
+    if (
+      eventType === 'backtracking' ||
+      event.elementId.toLowerCase().includes('back') ||
+      metadata.backtracking === true
+    ) {
       signals.add('backtracking');
     }
-    if (metadata.failed === true || metadata.attempt !== undefined && Number(metadata.attempt) > 2) {
+    if (
+      eventType === 'failed_attempt' ||
+      eventType === 'failed_attempts' ||
+      metadata.failed === true ||
+      metadata.attempt !== undefined && Number(metadata.attempt) > 2
+    ) {
       signals.add('failed_attempts');
     }
   }
