@@ -6,20 +6,23 @@ import { StateManager } from './state/stateManager.js';
 import { DynamicRenderer } from './renderer/DynamicRenderer.js';
 
 // TODO: replace with the real orchestrator URL once Member 1 shares it
-const ORCHESTRATOR_WS_URL = 'ws://localhost:8080';
+const WEBSOCKET_URL = import.meta.env.VITE_WS_URL ?? 'ws://127.0.0.1:3001';
 
 export function AdaptiveForm() {
   const [generatedTree, setGeneratedTree] = useState<unknown>(null);
   const [isAdapting, setIsAdapting] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
+  const submitRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const client = new TelemetryWebSocketClient();
     const stateManager = new StateManager();
     const tracker = new DomTelemetryTracker(client);
+    client.onConnectionChange(setIsConnected);
 
     const handleAdaptation = createAdaptationHandler(stateManager, {
       onStarted: () => setIsAdapting(true),
@@ -33,11 +36,12 @@ export function AdaptiveForm() {
     });
 
     client.onServerMessage(handleAdaptation);
-    client.connect(ORCHESTRATOR_WS_URL);
+    client.connect(WEBSOCKET_URL);
 
     [nameRef, emailRef, phoneRef].forEach((ref) => {
       if (ref.current) tracker.attach(ref.current);
     });
+    if (submitRef.current) tracker.attachClick(submitRef.current, 'submit-button');
 
     return () => client.close();
   }, []);
@@ -49,6 +53,7 @@ export function AdaptiveForm() {
   return (
     <form onSubmit={(e) => e.preventDefault()}>
       <h2>AuraGen Demo Form</h2>
+      <p role="status">{isConnected ? 'Connected' : 'Disconnected. Reconnecting...'}</p>
       {isAdapting && <p>Adjusting the form for you...</p>}
 
       <div>
@@ -73,7 +78,7 @@ export function AdaptiveForm() {
         />
       </div>
 
-      <button type="submit">Submit</button>
+      <button ref={submitRef} type="submit">Submit</button>
     </form>
   );
 }
