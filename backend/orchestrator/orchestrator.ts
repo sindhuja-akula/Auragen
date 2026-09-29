@@ -1,24 +1,24 @@
 import type { AdaptationResult } from '../../shared/contracts/adaptation.js';
 import type { CognitiveScore } from '../../shared/contracts/cognitive.js';
+import type { GeneratedUI } from '../../shared/contracts/generated-ui.js';
 import type { RedesignRequest } from '../../shared/contracts/redesign.js';
 import type { ValidationResult } from '../../shared/contracts/validation.js';
 import { LLMGenerator } from '../generation/llmGenerator.js';
 import { validateGeneratedUI } from '../../validator/validator/validateGeneratedUI.js';
 import { StateMachine, type StateValue } from './stateMachine.js';
 
-type GenerationOutput = { generated?: unknown };
-type GenerationPort = {
-  generate(request: RedesignRequest): GenerationOutput | Promise<GenerationOutput>;
+export type GenerationPort = {
+  generate(request: RedesignRequest): GeneratedUI | Promise<GeneratedUI>;
 };
 
-type ValidationPort = {
-  validate(generated: string, request: RedesignRequest): ValidationResult | Promise<ValidationResult>;
+export type ValidationPort = {
+  validate(generated: GeneratedUI, request: RedesignRequest): ValidationResult | Promise<ValidationResult>;
 };
 
 type ApplyResult = { restoredState?: Record<string, unknown> };
 type ApplyPort = {
   apply(
-    generated: string,
+    generated: GeneratedUI,
     context: OrchestratorContext,
   ): ApplyResult | void | Promise<ApplyResult | void>;
 };
@@ -109,9 +109,9 @@ export class Orchestrator {
 
     this.stateMachine.transition('ADAPTATION_REQUESTED');
     this.generationInFlight = true;
-  const generationId = this.nextGenerationId++;
-  this.activeGenerationId = generationId;
-  this.log('generation_started', { generationId, score: score.score, reason: 'threshold_exceeded' });
+    const generationId = this.nextGenerationId++;
+    this.activeGenerationId = generationId;
+    this.log('generation_started', { generationId, score: score.score, reason: 'threshold_exceeded' });
 
     const request: RedesignRequest = {
       sessionId: context.sessionId ?? 'session-1',
@@ -131,13 +131,13 @@ export class Orchestrator {
         return this.failure('stale generation result', context);
       }
 
-      if (!result || !result.generated || typeof result.generated !== 'string') {
+      if (!isGeneratedUI(result)) {
         throw new Error('Generation returned malformed output');
       }
 
       this.stateMachine.transition('VALIDATING');
       const validationResult = await (this.options.validator ?? this.defaultValidator).validate(
-        result.generated,
+        result,
         request,
       );
       if (!validationResult.valid) {
@@ -149,14 +149,14 @@ export class Orchestrator {
       }
 
       this.stateMachine.transition('APPLYING');
-      const applied = await (this.options.applier ?? this.defaultApplier).apply(result.generated, context);
+  const applied = await (this.options.applier ?? this.defaultApplier).apply(result, context);
       this.cooldownUntil = this.now() + this.cooldownMs;
       this.stateMachine.transition('COOLDOWN');
       this.log('adaptation_completed', { generationId });
 
       return {
         status: 'adaptation_complete',
-        component: result.generated,
+        component: result.componentName,
         restoredState: applied?.restoredState ?? context.currentState ?? {},
         latency: 0,
         reason: 'adaptation applied after validation',
@@ -170,10 +170,7 @@ export class Orchestrator {
   }
 
   private readonly defaultValidator: ValidationPort = {
-    validate: (generated) => {
-      const result = validateGeneratedUI(generated);
-      return { ...result, warnings: [] };
-    },
+    validate: (generated) => validateGeneratedUI(generated),
   };
 
   private readonly defaultApplier: ApplyPort = {
@@ -248,4 +245,17 @@ export class Orchestrator {
   run() {
     return 'orchestration started';
   }
+}
+
+function isGeneratedUI(value: unknown): value is GeneratedUI {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+
+  const generated = value as Record<string, unknown>;
+  return typeof generated.code === 'string' &&
+    typeof generated.componentName === 'string' &&
+    Array.isArray(generated.dependencies) &&
+    generated.dependencies.every((dependency) => typeof dependency === 'string') &&
+    typeof generated.metadata === 'object' &&
+    generated.metadata !== null &&
+    !Array.isArray(generated.metadata);
 }

@@ -39,3 +39,6 @@ D34	Latest evidence	Retain the newest CognitiveScore while a generation is activ
 D35	Generation timeout	Use an optional in-process timeout around M3 and release the active generation identity on expiry	A hung provider must not permanently block future adaptations.
 D36	Stale result handling	Associate each lifecycle with a local generation ID and reject results after timeout or lifecycle invalidation	Late provider results must never overwrite a newer lifecycle.
 D37	Boundary ports	Inject validation and application ports into M1 while keeping validator and renderer responsibilities outside the orchestrator	This makes failure paths testable without moving M4 or M2 logic into M1.
+D38	Shared contract authority	Freeze the six contracts under shared/contracts as the single source of truth	Prevents field and semantic drift between M1, M2, M3, and M4; future changes require coordinated Team Lead review.
+D39	Validation decision field	Use valid as the canonical ValidationResult success field and remove ok	Two competing booleans could contradict each other; M1 and M4 now share one decision.
+D40	Generated UI boundary	M3 returns GeneratedUI and M4 consumes it; M1 reports componentName rather than source code	Keeps generated source in GeneratedUI.code and preserves AdaptationResult.component as an identifier.

@@ -8,5 +8,4 @@ export type ValidationResult = {
   errors: string[];
   warnings: string[];
   issues?: ValidationIssue[];
-  ok?: boolean;
 };

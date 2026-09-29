@@ -1,11 +1,19 @@
 import type { RedesignRequest } from '../../shared/contracts/redesign.js';
+import type { GeneratedUI } from '../../shared/contracts/generated-ui.js';
 
-export class LLMGenerator {
-  generate(request: RedesignRequest) {
+export interface LLMGenerator {
+  generate(request: RedesignRequest): Promise<GeneratedUI>;
+}
+
+export class LLMGenerator implements LLMGenerator {
+  async generate(request: RedesignRequest): Promise<GeneratedUI> {
     return {
-      signals: request.cognitiveSignals,
-      context: request,
-      generated: 'placeholder-ui',
+      code: 'placeholder-ui',
+      componentName: 'PlaceholderUI',
+      dependencies: [],
+      metadata: {
+        signals: request.cognitiveSignals,
+      },
     };
   }
 }

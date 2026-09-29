@@ -73,3 +73,19 @@ day 1 (team lead)
 * M4 must replace the current validator stub with AST and security validation.
 * M2 must provide the real application and state-restoration port before generated UI is rendered.
 
+## 2026-09-29: Shared contract audit and freeze
+
+### Completed
+
+* Verified the six authoritative contracts under `shared/contracts/` and their M2, M1, M3, and M4 producers/consumers.
+* Removed the duplicate `ok` validation boolean; `ValidationResult.valid` is canonical.
+* Migrated the generator and validator boundaries to shared `GeneratedUI` and `ValidationResult` shapes.
+* Confirmed `AdaptationResult.component` carries a component identifier, while generated source remains in `GeneratedUI.code`.
+* Added compile-time compatibility coverage and published the freeze/change-control policy in `docs/contracts.md`.
+
+### Freeze status
+
+**SHARED CONTRACTS FROZEN**
+
+Future contract changes require a documented architectural problem, Team Lead review, coordinated producer/consumer updates, tests, and an explicit contract-change commit.
+

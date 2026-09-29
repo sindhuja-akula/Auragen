@@ -2,8 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { Orchestrator } from '../../backend/orchestrator/orchestrator.js';
 import { TelemetryPipeline } from '../../backend/orchestrator/telemetryPipeline.js';
 import type { CognitiveScore } from '../../shared/contracts/cognitive.js';
+import type { GeneratedUI } from '../../shared/contracts/generated-ui.js';
 import type { RedesignRequest } from '../../shared/contracts/redesign.js';
 import type { TelemetryEvent } from '../../shared/contracts/telemetry.js';
+
+const makeGeneratedUI = (code = 'placeholder-ui', componentName = 'PlaceholderUI'): GeneratedUI => ({
+  code,
+  componentName,
+  dependencies: [],
+  metadata: {},
+});
 
 describe('orchestrator', () => {
   const highScore: CognitiveScore = {
@@ -57,8 +65,8 @@ describe('orchestrator', () => {
   });
 
   it('holds the generation lock until async generation finishes', async () => {
-    let finishGeneration!: (output: { generated: string }) => void;
-    const generate = vi.fn(() => new Promise<{ generated: string }>((resolve) => {
+    let finishGeneration!: (output: GeneratedUI) => void;
+    const generate = vi.fn(() => new Promise<GeneratedUI>((resolve) => {
       finishGeneration = resolve;
     }));
     const orchestrator = new Orchestrator(5000, { generate });
@@ -71,13 +79,13 @@ describe('orchestrator', () => {
     expect(orchestrator.currentState).toBe('GENERATING');
     expect(generate).toHaveBeenCalledTimes(1);
 
-    finishGeneration({ generated: 'placeholder-ui' });
+    finishGeneration(makeGeneratedUI());
     expect((await firstRequest).status).toBe('adaptation_complete');
     expect(orchestrator.currentState).toBe('COOLDOWN');
   });
 
   it('constructs the shared RedesignRequest for generation', async () => {
-    const generate = vi.fn((request: RedesignRequest) => ({ generated: 'placeholder-ui' }));
+    const generate = vi.fn((request: RedesignRequest) => makeGeneratedUI());
     const orchestrator = new Orchestrator(5000, { generate });
 
     await orchestrator.evaluate(highScore, {
@@ -114,7 +122,7 @@ describe('orchestrator', () => {
   });
 
   it('adapts at a score equal to the threshold', async () => {
-    const generate = vi.fn(() => ({ generated: 'placeholder-ui' }));
+    const generate = vi.fn(() => makeGeneratedUI());
     const orchestrator = new Orchestrator(5000, { generate });
 
     const result = await orchestrator.evaluate({ ...highScore, score: 0.7 });
@@ -125,7 +133,7 @@ describe('orchestrator', () => {
 
   it('blocks high evidence during cooldown and retries after deterministic expiry', async () => {
     let now = 1000;
-    const generate = vi.fn(() => ({ generated: 'placeholder-ui' }));
+    const generate = vi.fn(() => makeGeneratedUI());
     const orchestrator = new Orchestrator(1000, { generate }, { now: () => now });
 
     await orchestrator.evaluate(highScore);
@@ -142,8 +150,8 @@ describe('orchestrator', () => {
   });
 
   it('retains the latest evidence without starting a second generation', async () => {
-    let finishGeneration!: (output: { generated: string }) => void;
-    const generate = vi.fn(() => new Promise<{ generated: string }>((resolve) => {
+    let finishGeneration!: (output: GeneratedUI) => void;
+    const generate = vi.fn(() => new Promise<GeneratedUI>((resolve) => {
       finishGeneration = resolve;
     }));
     const orchestrator = new Orchestrator(5000, { generate });
@@ -155,14 +163,14 @@ describe('orchestrator', () => {
     expect(orchestrator.latestScore?.score).toBe(0.98);
     expect(generate).toHaveBeenCalledTimes(1);
 
-    finishGeneration({ generated: 'placeholder-ui' });
+    finishGeneration(makeGeneratedUI());
     await first;
   });
 
   it('times out a hung generation and releases the lock for recovery', async () => {
     vi.useFakeTimers();
     try {
-      const generate = vi.fn(() => new Promise<{ generated: string }>(() => undefined));
+      const generate = vi.fn(() => new Promise<GeneratedUI>(() => undefined));
       const orchestrator = new Orchestrator(5000, { generate }, { generationTimeoutMs: 100 });
 
       const pending = orchestrator.evaluate(highScore);
@@ -173,7 +181,7 @@ describe('orchestrator', () => {
       expect(timedOut.reason).toBe('generation timeout');
       expect(orchestrator.currentState).toBe('FAILED');
 
-      generate.mockResolvedValueOnce({ generated: 'recovered-ui' });
+      generate.mockResolvedValueOnce(makeGeneratedUI('recovered-code', 'RecoveredUI'));
       const recovered = await orchestrator.evaluate({ ...highScore, score: 0.91 });
       expect(recovered.status).toBe('adaptation_complete');
     } finally {
@@ -181,19 +189,19 @@ describe('orchestrator', () => {
     }
   });
 
-  it('rejects malformed generation output and preserves the current state', async () => {
-    const generate = vi.fn(() => ({ generated: { invalid: true } }));
+  it('rejects invalid generated code and preserves the current state', async () => {
+    const generate = vi.fn(() => makeGeneratedUI('', 'InvalidUI'));
     const orchestrator = new Orchestrator(5000, { generate });
 
     const result = await orchestrator.evaluate(highScore, { currentState: { email: 'kept' } });
 
-    expect(result.status).toBe('adaptation_failed');
+    expect(result.status).toBe('validation_failed');
     expect(result.restoredState).toEqual({ email: 'kept' });
     expect(orchestrator.currentState).toBe('FAILED');
   });
 
   it('does not apply validation failures and remains recoverable', async () => {
-    const generate = vi.fn(() => ({ generated: 'unsafe-ui' }));
+    const generate = vi.fn(() => makeGeneratedUI('unsafe-code', 'UnsafeUI'));
     const apply = vi.fn(() => ({ restoredState: { preserved: true } }));
     const validate = vi.fn(() => ({ valid: false, errors: ['unsafe call'], warnings: [] }));
     const orchestrator = new Orchestrator(5000, { generate }, { validator: { validate }, applier: { apply } });
@@ -210,7 +218,7 @@ describe('orchestrator', () => {
   });
 
   it('treats application failure as failed and protects the current UI', async () => {
-    const generate = vi.fn(() => ({ generated: 'valid-ui' }));
+    const generate = vi.fn(() => makeGeneratedUI('valid-code', 'ValidUI'));
     const apply = vi.fn(() => { throw new Error('renderer unavailable'); });
     const orchestrator = new Orchestrator(5000, { generate }, { applier: { apply } });
 
@@ -224,12 +232,12 @@ describe('orchestrator', () => {
   it('rejects a timed-out result that arrives after a newer lifecycle starts', async () => {
     vi.useFakeTimers();
     try {
-      let finishOld!: (output: { generated: string }) => void;
+      let finishOld!: (output: GeneratedUI) => void;
       const generate = vi.fn()
-        .mockImplementationOnce(() => new Promise<{ generated: string }>((resolve) => {
+        .mockImplementationOnce(() => new Promise<GeneratedUI>((resolve) => {
           finishOld = resolve;
         }))
-        .mockImplementationOnce(() => ({ generated: 'new-ui' }));
+        .mockImplementationOnce(() => makeGeneratedUI('new-code', 'NewUI'));
       const apply = vi.fn();
       const orchestrator = new Orchestrator(0, { generate }, {
         generationTimeoutMs: 100,
@@ -241,12 +249,12 @@ describe('orchestrator', () => {
       await oldRequest;
 
       const newRequest = orchestrator.evaluate({ ...highScore, score: 0.91 });
-      finishOld({ generated: 'old-ui' });
+      finishOld(makeGeneratedUI('old-code', 'OldUI'));
       const result = await newRequest;
 
       expect(result.status).toBe('adaptation_complete');
       expect(apply).toHaveBeenCalledTimes(1);
-      expect(apply).toHaveBeenCalledWith('new-ui', {});
+      expect(apply).toHaveBeenCalledWith(makeGeneratedUI('new-code', 'NewUI'), {});
     } finally {
       vi.useRealTimers();
     }
