@@ -11,6 +11,9 @@
     "start:ws": "tsx backend/websocket/server.ts"
   },
   "dependencies": {
+    "@babel/parser": "^7.29.9",
+    "@babel/traverse": "^8.0.6",
+    "@babel/types": "^8.0.6",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "ws": "^8.18.0"
