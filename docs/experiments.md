@@ -15,3 +15,14 @@ Track experimental prompt variations, validation strategies, and telemetry exper
 **Explanation:** The scorer maps frontend event names to cognitive signals over a bounded 20-event session window. The Orchestrator owns threshold, in-flight, and cooldown decisions.
 
 **Lesson:** Browser → WebSocket → Node → CognitiveScore → Orchestrator is verified. Generated UI integration is not: Member 3's branch uses a private request shape, and the current AST/security validator is a stub. Keep generated output out of the renderer until those boundaries are implemented and tested.
+
+## 2026-09-29: M1 deliberate-break experiments
+
+| Experiment | Expected result | Actual result | Lesson |
+| --- | --- | --- | --- |
+| M3 never resolves | Timeout, `FAILED`, future request works | Passing test: timeout releases the lock and recovery succeeds | Provider hangs are recoverable when timeout cleanup clears lifecycle identity |
+| Ten high-score events during one generation | At most one active generation | Passing test: generator called once and latest score retained | Latest evidence is sufficient; an unbounded queue is unnecessary |
+| Old result resolves after timeout and retry | Old result rejected, new UI is the only applied result | Passing test: applier called once for the new result | Local generation identity prevents stale application |
+| M4 rejects candidate | Current UI preserved, no application, future retry works | Passing test: `validation_failed`, applier untouched, retry succeeds | Validation rejection is not successful cooldown |
+| M2 application throws | `FAILED`, preserved state, future lifecycle remains possible | Passing test: `adaptation_failed` with preserved state | Application success is required for completion |
+| Continuous high scores during cooldown | No adaptation storm | Passing test: cooldown blocks until injected clock expires | Cooldown is a decision gate, not another generation mechanism |

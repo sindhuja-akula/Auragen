@@ -34,3 +34,8 @@ D29	Telemetry pipeline	WebSocket validates and forwards; a separate pipeline sco
 D30	Generator boundary	Pass the shared RedesignRequest directly to the generation port	Generation implementations must adapt to the shared contract, not the reverse.
 D31	Unvalidated output	Do not send generated content to the frontend until AST/security validation is implemented and connected	The current validator is a stub and must not authorize rendering.
 D32	Async generation lock	Keep the in-flight lock until the generation promise settles; retain current state while concurrent evidence is observed	Prevents overlapping generation while allowing later score reevaluation.
+D33	Lifecycle truth	Enter VALIDATING only after M3 returns, APPLYING only after M4 approves, and COOLDOWN only after M2 applies successfully	State names must describe real events; generated output alone is not an adaptation.
+D34	Latest evidence	Retain the newest CognitiveScore while a generation is active	Prevents adaptation storms without losing the most relevant signal.
+D35	Generation timeout	Use an optional in-process timeout around M3 and release the active generation identity on expiry	A hung provider must not permanently block future adaptations.
+D36	Stale result handling	Associate each lifecycle with a local generation ID and reject results after timeout or lifecycle invalidation	Late provider results must never overwrite a newer lifecycle.
+D37	Boundary ports	Inject validation and application ports into M1 while keeping validator and renderer responsibilities outside the orchestrator	This makes failure paths testable without moving M4 or M2 logic into M1.

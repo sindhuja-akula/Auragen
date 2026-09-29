@@ -52,3 +52,24 @@ day 1 (team lead)
 * Implement and test AST parsing/security validation before connecting generated output to the renderer.
 * Then add the validated result and state-preservation path to the WebSocket/frontend integration.
 
+## 2026-09-29: M1 orchestration hardening
+
+### Completed
+
+* Added explicit state transition rules for the orchestration lifecycle.
+* Added domain input checks, optional generation timeout, local generation identity, stale-result rejection, and latest-evidence retention.
+* Added validation and application ports; cooldown now begins only after successful validation and application.
+* Added recovery coverage for generator errors, malformed output, timeout, validation rejection, and application failure.
+* Updated the test script to run the full workspace suite.
+
+### Verification
+
+* `npm test`: 38 tests passed.
+* `npm run build`: passed.
+
+### Remaining integration dependencies
+
+* M3 must return the shared generated UI shape through the generation port.
+* M4 must replace the current validator stub with AST and security validation.
+* M2 must provide the real application and state-restoration port before generated UI is rendered.
+

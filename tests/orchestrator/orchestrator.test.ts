@@ -38,7 +38,7 @@ describe('orchestrator', () => {
 
     const result = await orchestrator.evaluate(score, { currentUI: { title: 'Home' } });
 
-    expect(result.status).toBe('adaptation_started');
+    expect(result.status).toBe('adaptation_complete');
   });
 
   it('prevents concurrent generation when one is already in flight', async () => {
@@ -72,7 +72,7 @@ describe('orchestrator', () => {
     expect(generate).toHaveBeenCalledTimes(1);
 
     finishGeneration({ generated: 'placeholder-ui' });
-    expect((await firstRequest).status).toBe('adaptation_started');
+    expect((await firstRequest).status).toBe('adaptation_complete');
     expect(orchestrator.currentState).toBe('COOLDOWN');
   });
 
@@ -112,6 +112,145 @@ describe('orchestrator', () => {
     expect(retry.status).toBe('no_adaptation');
     expect(orchestrator.currentState).toBe('IDLE');
   });
+
+  it('adapts at a score equal to the threshold', async () => {
+    const generate = vi.fn(() => ({ generated: 'placeholder-ui' }));
+    const orchestrator = new Orchestrator(5000, { generate });
+
+    const result = await orchestrator.evaluate({ ...highScore, score: 0.7 });
+
+    expect(result.status).toBe('adaptation_complete');
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks high evidence during cooldown and retries after deterministic expiry', async () => {
+    let now = 1000;
+    const generate = vi.fn(() => ({ generated: 'placeholder-ui' }));
+    const orchestrator = new Orchestrator(1000, { generate }, { now: () => now });
+
+    await orchestrator.evaluate(highScore);
+    const blocked = await orchestrator.evaluate({ ...highScore, score: 0.95 });
+
+    expect(blocked.reason).toBe('cooldown active');
+    expect(generate).toHaveBeenCalledTimes(1);
+
+    now = 2000;
+    const retried = await orchestrator.evaluate({ ...highScore, score: 0.95 });
+
+    expect(retried.status).toBe('adaptation_complete');
+    expect(generate).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains the latest evidence without starting a second generation', async () => {
+    let finishGeneration!: (output: { generated: string }) => void;
+    const generate = vi.fn(() => new Promise<{ generated: string }>((resolve) => {
+      finishGeneration = resolve;
+    }));
+    const orchestrator = new Orchestrator(5000, { generate });
+
+    const first = orchestrator.evaluate(highScore);
+    const second = await orchestrator.evaluate({ ...highScore, score: 0.98 });
+
+    expect(second.reason).toBe('generation already in progress');
+    expect(orchestrator.latestScore?.score).toBe(0.98);
+    expect(generate).toHaveBeenCalledTimes(1);
+
+    finishGeneration({ generated: 'placeholder-ui' });
+    await first;
+  });
+
+  it('times out a hung generation and releases the lock for recovery', async () => {
+    vi.useFakeTimers();
+    try {
+      const generate = vi.fn(() => new Promise<{ generated: string }>(() => undefined));
+      const orchestrator = new Orchestrator(5000, { generate }, { generationTimeoutMs: 100 });
+
+      const pending = orchestrator.evaluate(highScore);
+      await vi.advanceTimersByTimeAsync(100);
+      const timedOut = await pending;
+
+      expect(timedOut.status).toBe('adaptation_failed');
+      expect(timedOut.reason).toBe('generation timeout');
+      expect(orchestrator.currentState).toBe('FAILED');
+
+      generate.mockResolvedValueOnce({ generated: 'recovered-ui' });
+      const recovered = await orchestrator.evaluate({ ...highScore, score: 0.91 });
+      expect(recovered.status).toBe('adaptation_complete');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects malformed generation output and preserves the current state', async () => {
+    const generate = vi.fn(() => ({ generated: { invalid: true } }));
+    const orchestrator = new Orchestrator(5000, { generate });
+
+    const result = await orchestrator.evaluate(highScore, { currentState: { email: 'kept' } });
+
+    expect(result.status).toBe('adaptation_failed');
+    expect(result.restoredState).toEqual({ email: 'kept' });
+    expect(orchestrator.currentState).toBe('FAILED');
+  });
+
+  it('does not apply validation failures and remains recoverable', async () => {
+    const generate = vi.fn(() => ({ generated: 'unsafe-ui' }));
+    const apply = vi.fn(() => ({ restoredState: { preserved: true } }));
+    const validate = vi.fn(() => ({ valid: false, errors: ['unsafe call'], warnings: [] }));
+    const orchestrator = new Orchestrator(5000, { generate }, { validator: { validate }, applier: { apply } });
+
+    const rejected = await orchestrator.evaluate(highScore);
+
+    expect(rejected.status).toBe('validation_failed');
+    expect(apply).not.toHaveBeenCalled();
+    expect(orchestrator.currentState).toBe('FAILED');
+
+    validate.mockReturnValue({ valid: true, errors: [], warnings: [] });
+    const recovered = await orchestrator.evaluate({ ...highScore, score: 0.92 });
+    expect(recovered.status).toBe('adaptation_complete');
+  });
+
+  it('treats application failure as failed and protects the current UI', async () => {
+    const generate = vi.fn(() => ({ generated: 'valid-ui' }));
+    const apply = vi.fn(() => { throw new Error('renderer unavailable'); });
+    const orchestrator = new Orchestrator(5000, { generate }, { applier: { apply } });
+
+    const failed = await orchestrator.evaluate(highScore, { currentState: { value: 'safe' } });
+
+    expect(failed.status).toBe('adaptation_failed');
+    expect(failed.restoredState).toEqual({ value: 'safe' });
+    expect(orchestrator.currentState).toBe('FAILED');
+  });
+
+  it('rejects a timed-out result that arrives after a newer lifecycle starts', async () => {
+    vi.useFakeTimers();
+    try {
+      let finishOld!: (output: { generated: string }) => void;
+      const generate = vi.fn()
+        .mockImplementationOnce(() => new Promise<{ generated: string }>((resolve) => {
+          finishOld = resolve;
+        }))
+        .mockImplementationOnce(() => ({ generated: 'new-ui' }));
+      const apply = vi.fn();
+      const orchestrator = new Orchestrator(0, { generate }, {
+        generationTimeoutMs: 100,
+        applier: { apply },
+      });
+
+      const oldRequest = orchestrator.evaluate(highScore);
+      await vi.advanceTimersByTimeAsync(100);
+      await oldRequest;
+
+      const newRequest = orchestrator.evaluate({ ...highScore, score: 0.91 });
+      finishOld({ generated: 'old-ui' });
+      const result = await newRequest;
+
+      expect(result.status).toBe('adaptation_complete');
+      expect(apply).toHaveBeenCalledTimes(1);
+      expect(apply).toHaveBeenCalledWith('new-ui', {});
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('telemetry pipeline', () => {
@@ -143,7 +282,7 @@ describe('telemetry pipeline', () => {
     expect(result.cognitiveScore.signals).toEqual(
       expect.arrayContaining(['repeated_clicks', 'hesitation']),
     );
-    expect(result.adaptation.status).toBe('adaptation_started');
+    expect(result.adaptation.status).toBe('adaptation_complete');
     expect(result.currentState).toBe('COOLDOWN');
 
     const duringCooldown = await pipeline.process(makeEvent('backtracking'));
