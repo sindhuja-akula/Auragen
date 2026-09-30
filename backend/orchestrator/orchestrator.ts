@@ -170,7 +170,7 @@ export class Orchestrator {
   }
 
   private readonly defaultValidator: ValidationPort = {
-    validate: (generated) => validateGeneratedUI(generated),
+    validate: (generated) => validateGeneratedUI(generated.code),
   };
 
   private readonly defaultApplier: ApplyPort = {

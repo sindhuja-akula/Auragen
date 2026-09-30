@@ -14,8 +14,6 @@ import type {
 import { parseCode } from "../parser/babelParser.js";
 import { checkImports } from "../policies/imports.policy.js";
 import { checkGlobals } from "../policies/globals.policy.js";
-
-import { checkCalls } from "../policies/calls.policy.js";
 import {
   checkCalls,
   checkMemberExpressions
