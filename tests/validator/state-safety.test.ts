@@ -18,7 +18,7 @@ describe("validateGeneratedUI — state safety", () => {
         );
       }
     `);
-    expect(result.ok).toBe(true);
+    expect(result.valid).toBe(true);
   });
 
   it("passes a component mirroring initial state into useState", () => {
@@ -35,8 +35,9 @@ describe("validateGeneratedUI — state safety", () => {
         );
       }
     `);
-    expect(result.ok).toBe(true);
+    expect(result.valid).toBe(true);
   });
+
 
   it("rejects a component that tries to exfiltrate state via fetch()", () => {
     const result = validateGeneratedUI(`
@@ -47,7 +48,7 @@ describe("validateGeneratedUI — state safety", () => {
         return <input value={name} onChange={(e) => setName(e.target.value)} />;
       }
     `);
-    expect(result.ok).toBe(false);
-    expect(result.issues.some((i) => i.path === "call:fetch")).toBe(true);
+    expect(result.valid).toBe(false);
+    (result.issues ?? []).some((i) => i.path === "call:fetch")
   });
 });

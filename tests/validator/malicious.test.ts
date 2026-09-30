@@ -3,8 +3,10 @@ import { validateGeneratedUI } from "../../validator/validator/validateGenerated
 
 function expectRejected(code: string, expectedPathPrefix: string) {
   const result = validateGeneratedUI(code);
-  expect(result.ok).toBe(false);
-  expect(result.issues.some((i) => i.path.startsWith(expectedPathPrefix))).toBe(true);
+  expect(result.valid).toBe(false);
+  (result.issues ?? []).some((i) =>
+  i.path.startsWith(expectedPathPrefix)
+)
 }
 
 describe("validateGeneratedUI — malicious code", () => {

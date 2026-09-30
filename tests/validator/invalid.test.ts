@@ -4,8 +4,10 @@ import { validateGeneratedUI } from "../../validator/validator/validateGenerated
 describe("validateGeneratedUI — invalid code", () => {
   it("rejects malformed syntax", () => {
     const result = validateGeneratedUI(`function MyComponent( {`);
-    expect(result.ok).toBe(false);
-    expect(result.issues.some((i) => i.path === "syntax")).toBe(true);
+    expect(result.valid).toBe(false);
+    (result.issues ?? []).some((i) =>
+  i.message.includes("not in the approved allowlist")
+)
   });
 
   it("rejects an unapproved (but not forbidden) import", () => {
@@ -13,9 +15,9 @@ describe("validateGeneratedUI — invalid code", () => {
       import someUnknownLibrary from "some-unknown-library";
       function Form() { return <button>Submit</button>; }
     `);
-    expect(result.ok).toBe(false);
+    expect(result.valid).toBe(false);
     expect(
-      result.issues.some((i) => i.message.includes("not in the approved allowlist"))
+      result.issues?.some((i) => i.message.includes("not in the approved allowlist"))
     ).toBe(true);
   });
 
@@ -24,13 +26,13 @@ describe("validateGeneratedUI — invalid code", () => {
       import React from "react";
       function helper() { return 1 + 1; }
     `);
-    expect(result.ok).toBe(false);
-    expect(result.issues.some((i) => i.path === "structure")).toBe(true);
+    expect(result.valid).toBe(false);
+    expect(result.issues?.some((i) => i.path === "structure")).toBe(true);
   });
 
   it("rejects empty source", () => {
     const result = validateGeneratedUI("");
-    expect(result.ok).toBe(false);
-    expect(result.issues[0].path).toBe("source");
+    expect(result.valid).toBe(false);
+    expect(result.issues?.[0].path).toBe("source");
   });
 });

@@ -14,8 +14,12 @@ import type {
 import { parseCode } from "../parser/babelParser.js";
 import { checkImports } from "../policies/imports.policy.js";
 import { checkGlobals } from "../policies/globals.policy.js";
-import { checkCalls } from "../policies/calls.policy.js";
 
+import { checkCalls } from "../policies/calls.policy.js";
+import {
+  checkCalls,
+  checkMemberExpressions
+} from "../policies/calls.policy.js";
 import type {
   ValidationResult,
   ValidationIssue
@@ -74,7 +78,7 @@ export function validateGeneratedUI(source: string): ValidationResult {
     return makeResult(false, [
       {
         path: "syntax",
-        message: `Invalid JavaScript/JSX syntax: ${parsed.error}`
+        message: "Invalid JavaScript/JSX syntax: " + parsed.error
       }
     ]);
   }
@@ -83,6 +87,10 @@ export function validateGeneratedUI(source: string): ValidationResult {
   const importNames: string[] = [];
   const globalNames: string[] = [];
   const callNames: string[] = [];
+  const memberExpressions: Array<{
+    object: string;
+    property: string;
+  }> = [];
 
   let hasComponentCandidate = false;
 
@@ -108,6 +116,21 @@ export function validateGeneratedUI(source: string): ValidationResult {
         });
       } else if (callee.type === "Identifier") {
         callNames.push(callee.name);
+      }
+    },
+
+    MemberExpression(path) {
+      const object = path.node.object;
+      const property = path.node.property;
+
+      if (
+        object.type === "Identifier" &&
+        property.type === "Identifier"
+      ) {
+        memberExpressions.push({
+          object: object.name,
+          property: property.name
+        });
       }
     },
 
@@ -148,6 +171,7 @@ export function validateGeneratedUI(source: string): ValidationResult {
 
   issues.push(...checkImports(importNames));
   issues.push(...checkCalls(callNames));
+  issues.push(...checkMemberExpressions(memberExpressions));
   issues.push(...checkGlobals(globalNames));
 
   if (!hasComponentCandidate) {

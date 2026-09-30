@@ -9,7 +9,7 @@ describe("validateGeneratedUI — valid code", () => {
         return <button>Submit</button>;
       }
     `);
-    expect(result.ok).toBe(true);
+    expect(result.valid).toBe(true);
     expect(result.issues).toHaveLength(0);
   });
 
@@ -27,7 +27,7 @@ describe("validateGeneratedUI — valid code", () => {
         );
       }
     `);
-    expect(result.ok).toBe(true);
+    expect(result.valid).toBe(true);
   });
 
   it("passes an arrow function component", () => {
@@ -35,7 +35,7 @@ describe("validateGeneratedUI — valid code", () => {
       import React from "react";
       const Greeting = () => <div>Hello</div>;
     `);
-    expect(result.ok).toBe(true);
+    expect(result.valid).toBe(true);
   });
 
   it("passes an arrow function component with a block body", () => {
@@ -45,6 +45,6 @@ describe("validateGeneratedUI — valid code", () => {
         return <div>Hello</div>;
       };
     `);
-    expect(result.ok).toBe(true);
+    expect(result.valid).toBe(true);
   });
 });

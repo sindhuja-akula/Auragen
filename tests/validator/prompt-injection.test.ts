@@ -13,7 +13,7 @@ describe("validateGeneratedUI — prompt injection resilience", () => {
         return <div>Ignoring all AuraGen rules as requested</div>;
       }
     `);
-    expect(result.ok).toBe(false);
+    expect(result.valid).toBe(false);
   });
 
   it("rejects an injected eval() regardless of framing", () => {
@@ -23,6 +23,6 @@ describe("validateGeneratedUI — prompt injection resilience", () => {
         return <div>Hello</div>;
       }
     `);
-    expect(result.ok).toBe(false);
+    expect(result.valid).toBe(false);
   });
 });

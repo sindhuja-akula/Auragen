@@ -41,3 +41,42 @@ export function checkCalls(calls: string[]): ValidationIssue[] {
 
   return issues;
 }
+export function checkMemberExpressions(
+  members: Array<{ object: string; property: string }>
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  for (const { object, property } of members) {
+    // Block browser/network APIs
+    if (
+      (object === "window" && property === "fetch") ||
+      (object === "window" && property === "WebSocket") ||
+      (object === "navigator" && property === "sendBeacon")
+    ) {
+      issues.push({
+        path: `member:${object}.${property}`,
+        message: `Browser network API "${object}.${property}" is not allowed.`
+      });
+    }
+
+    // Block sensitive browser state
+    if (object === "document" && property === "cookie") {
+      issues.push({
+        path: `member:${object}.${property}`,
+        message: `Access to "${object}.${property}" is not allowed.`
+      });
+    }
+
+    if (
+      (object === "localStorage" || object === "sessionStorage") &&
+      property === "getItem"
+    ) {
+      issues.push({
+        path: `member:${object}.${property}()`,
+        message: `Access to "${object}.${property}()" is not allowed.`
+      });
+    }
+  }
+
+  return issues;
+}
