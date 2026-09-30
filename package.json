@@ -1,0 +1,21 @@
+{
+  "name": "auragen",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "test-ai.ts",
+  "scripts": {
+    "test": "vitest",
+    "build": "tsc",
+    "dev": "tsx test-ai.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "groq-sdk": "^0.3.3",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  }
+}
