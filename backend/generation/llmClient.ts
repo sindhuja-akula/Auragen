@@ -18,7 +18,7 @@ export class LLMClient {
     const startTime = performance.now();
     try {
       const response = await this.groq.chat.completions.create({
-        model: "openai/gpt-oss-20b",
+        model: "openai/gpt-oss-20b", // Reverted back to your supported model
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
@@ -31,14 +31,17 @@ export class LLMClient {
       const latencyMs = Math.round(endTime - startTime);
 
       let content = response.choices[0]?.message?.content;
-      if (!content) {
+      if (!content || typeof content !== 'string' || content.trim() === '') {
         throw new Error("Provider Error: Received empty response from Groq.");
       }
 
-      // Clean markdown code blocks if returned
-      content = content.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "").trim();
+      // Robustly extract JSON block if wrapped in markdown or extra text
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Parsing Error: No valid JSON object found in LLM response.");
+      }
 
-      const rawResponse = JSON.parse(content);
+      const rawResponse = JSON.parse(jsonMatch[0]);
       return { rawResponse, latencyMs };
     } catch (error: any) {
       if (error instanceof SyntaxError) {

@@ -20,8 +20,15 @@ export class GenerationValidator {
       throw new Error("Validation Error: 'dependencies' must be an array.");
     }
 
-    if (!candidate.metadata || typeof candidate.metadata !== 'object') {
-      throw new Error("Validation Error: 'metadata' must be an object.");
+    // Validate that every element in dependencies is a string
+    for (const dep of candidate.dependencies) {
+      if (typeof dep !== 'string' || dep.trim() === '') {
+        throw new Error("Validation Error: Every element in 'dependencies' must be a non-empty string.");
+      }
+    }
+
+    if (!candidate.metadata || typeof candidate.metadata !== 'object' || Array.isArray(candidate.metadata)) {
+      throw new Error("Validation Error: 'metadata' must be a non-null object.");
     }
 
     return {

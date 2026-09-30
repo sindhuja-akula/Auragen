@@ -22,13 +22,11 @@ export class LLMGenerator implements ILLMGenerator {
     // 2. Call LLM client and measure latency
     const { rawResponse, latencyMs } = await this.client.call(systemPrompt, userPrompt);
 
-    // 3. Resolve target component name safely
+    // 3. Resolve target component name safely from object shape
     let targetName = "AdaptedComponent";
-    if (request.currentUI) {
+    if (request.currentUI && typeof request.currentUI === 'object') {
       if (typeof request.currentUI.name === 'string') {
         targetName = request.currentUI.name;
-      } else if (typeof request.currentUI === 'string') {
-        targetName = request.currentUI;
       }
     }
 

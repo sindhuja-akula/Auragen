@@ -9,5 +9,5 @@
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist"
   },
-  "include": ["backend/**/*", "shared/**/*", "test-ai.ts"]
+  "include": ["backend/**/*", "shared/**/*", "experiments/**/*"]
 }
