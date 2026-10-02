@@ -6,13 +6,16 @@ import type { GeneratedUI } from '../../shared/contracts/generated-ui.js';
 import type { RedesignRequest } from '../../shared/contracts/redesign.js';
 import type { TelemetryEvent } from '../../shared/contracts/telemetry.js';
 
-const makeGeneratedUI = (code = 'placeholder-ui', componentName = 'PlaceholderUI'): GeneratedUI => ({
+const makeGeneratedUI = (
+  code = 'placeholder-ui',
+  componentName = 'PlaceholderUI'
+): GeneratedUI => ({
   code,
   componentName,
   dependencies: [],
   metadata: {},
 });
-
+const generate = vi.fn(async () => makeGeneratedUI());
 describe('orchestrator', () => {
   const highScore: CognitiveScore = {
     score: 0.9,
@@ -22,7 +25,7 @@ describe('orchestrator', () => {
   };
 
   it('does not adapt when the score is below threshold', async () => {
-    const orchestrator = new Orchestrator();
+    const orchestrator =new Orchestrator(5000, { generate });
     const score: CognitiveScore = {
       score: 0.3,
       threshold: 0.7,
@@ -36,21 +39,19 @@ describe('orchestrator', () => {
   });
 
   it('starts adaptation when the score exceeds threshold', async () => {
-    const orchestrator = new Orchestrator();
+    const orchestrator = new Orchestrator(5000, { generate });
     const score: CognitiveScore = {
       score: 0.9,
       threshold: 0.7,
       signals: ['repeated_clicks', 'hesitation'],
       timestamp: Date.now(),
     };
-
     const result = await orchestrator.evaluate(score, { currentUI: { title: 'Home' } });
-
-    expect(result.status).toBe('adaptation_complete');
+expect(result.status).toBe('adaptation_complete');
   });
 
   it('prevents concurrent generation when one is already in flight', async () => {
-    const orchestrator = new Orchestrator();
+    const orchestrator =new Orchestrator();
     const score: CognitiveScore = {
       score: 0.9,
       threshold: 0.7,
@@ -271,7 +272,10 @@ describe('telemetry pipeline', () => {
   });
 
   it('keeps normal interactions below threshold and does not adapt', async () => {
-    const pipeline = new TelemetryPipeline(new Orchestrator(), { log: vi.fn() });
+    const pipeline = new TelemetryPipeline(
+  new Orchestrator(5000, { generate }),
+  { log: vi.fn() },
+);
 
     const result = await pipeline.process(makeEvent('interaction'));
 
@@ -281,7 +285,10 @@ describe('telemetry pipeline', () => {
   });
 
   it('passes accumulated frontend difficulty signals to the orchestrator', async () => {
-    const pipeline = new TelemetryPipeline(new Orchestrator(), { log: vi.fn() });
+    const pipeline = new TelemetryPipeline(
+  new Orchestrator(5000, { generate }),
+  { log: vi.fn() },
+);
 
     await pipeline.process(makeEvent('repeated_click'));
     const result = await pipeline.process(makeEvent('long_hesitation'));

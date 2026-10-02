@@ -47,10 +47,10 @@ export class Orchestrator {
   private nextGenerationId = 1;
 
   constructor(
-    private readonly cooldownMs = 5000,
-    private readonly generator: GenerationPort = new LLMGenerator(),
-    private readonly options: OrchestratorOptions = {},
-  ) {}
+  private readonly cooldownMs = 5000,
+  private readonly generator?: GenerationPort,
+  private readonly options: OrchestratorOptions = {},
+) {}
 
   get currentState(): StateValue {
     return this.stateMachine.state;
@@ -124,7 +124,17 @@ export class Orchestrator {
     this.stateMachine.transition('GENERATING');
 
     try {
-      const result = await this.withTimeout(this.generator.generate(request), generationId);
+      const generator = this.generator;
+
+//console.log('DEBUG generator =', generator);
+
+if (!generator) {
+  throw new Error('DEBUG: generator injection is undefined');
+}
+      const result = await this.withTimeout(
+      generator.generate(request),
+      generationId
+);
 
       if (this.activeGenerationId !== generationId) {
         this.log('stale_result_rejected', { generationId });
