@@ -9,9 +9,11 @@ export interface ILLMGenerator {
   generate(request: RedesignRequest): Promise<GeneratedUI>;
 }
 
+type LLMClientPort = Pick<LLMClient, 'call'>;
+
 export class LLMGenerator implements ILLMGenerator {
   constructor(
-    private readonly client: LLMClient = new LLMClient(),
+    private readonly client: LLMClientPort = new LLMClient(),
   ) {}
 
   async generate(request: RedesignRequest): Promise<GeneratedUI> {

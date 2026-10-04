@@ -10,6 +10,19 @@ export class GenerationValidator {
 
     const candidate = data as Record<string, unknown>;
 
+    const allowedFields = new Set([
+      'code',
+      'componentName',
+      'dependencies',
+      'metadata',
+    ]);
+
+    for (const key of Object.keys(candidate)) {
+      if (!allowedFields.has(key)) {
+        throw new Error(`Unexpected field: ${key}`);
+      }
+    }
+
     if (
       typeof candidate.code !== 'string' ||
       candidate.code.trim() === ''

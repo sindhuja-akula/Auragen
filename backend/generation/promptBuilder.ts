@@ -13,6 +13,7 @@ The JSON MUST contain exactly these fields:
 - code: string
 - componentName: string
 - dependencies: string[]
+- metadata: object
 
 Rules:
 1. Generate valid React component code.
