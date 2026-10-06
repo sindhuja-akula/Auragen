@@ -124,13 +124,7 @@ export class Orchestrator {
     this.stateMachine.transition('GENERATING');
 
     try {
-      const generator = this.generator;
-
-//console.log('DEBUG generator =', generator);
-
-if (!generator) {
-  throw new Error('DEBUG: generator injection is undefined');
-}
+      const generator = this.generator ?? new LLMGenerator();
       const result = await this.withTimeout(
       generator.generate(request),
       generationId
@@ -180,7 +174,7 @@ if (!generator) {
   }
 
   private readonly defaultValidator: ValidationPort = {
-    validate: (generated) => validateGeneratedUI(generated),
+    validate: (generated) => validateGeneratedUI(generated.code),
   };
 
   private readonly defaultApplier: ApplyPort = {

@@ -8,8 +8,45 @@ import type { GeneratedUI } from '../../shared/contracts/generated-ui.js';
 import type { RedesignRequest } from '../../shared/contracts/redesign.js';
 import type { TelemetryEvent } from '../../shared/contracts/telemetry.js';
 
+/**
+ * Valid React component used by tests that need generation
+ * to successfully pass the real AST/security validator.
+ */
+const VALID_COMPONENT_CODE = `
+function PlaceholderUI() {
+  return <div>Placeholder</div>;
+}
+`;
+
+/**
+ * Valid React component with a different component name.
+ */
+const VALID_RECOVERED_COMPONENT_CODE = `
+function RecoveredUI() {
+  return <div>Recovered</div>;
+}
+`;
+
+/**
+ * Valid React component representing a new generation.
+ */
+const VALID_NEW_COMPONENT_CODE = `
+function NewUI() {
+  return <div>New UI</div>;
+}
+`;
+
+/**
+ * Valid React component representing an old/stale generation.
+ */
+const VALID_OLD_COMPONENT_CODE = `
+function OldUI() {
+  return <div>Old UI</div>;
+}
+`;
+
 const makeGeneratedUI = (
-  code = 'placeholder-ui',
+  code = VALID_COMPONENT_CODE,
   componentName = 'PlaceholderUI',
 ): GeneratedUI => ({
   code,
@@ -189,7 +226,10 @@ describe('orchestrator', () => {
       { now: () => now },
     );
 
-    await orchestrator.evaluate(highScore);
+    const first = await orchestrator.evaluate(highScore);
+
+    expect(first.status).toBe('adaptation_complete');
+    expect(orchestrator.currentState).toBe('COOLDOWN');
 
     const blocked = await orchestrator.evaluate({
       ...highScore,
@@ -263,7 +303,10 @@ describe('orchestrator', () => {
       expect(orchestrator.currentState).toBe('FAILED');
 
       generate.mockResolvedValueOnce(
-        makeGeneratedUI('recovered-code', 'RecoveredUI'),
+        makeGeneratedUI(
+          VALID_RECOVERED_COMPONENT_CODE,
+          'RecoveredUI',
+        ),
       );
 
       const recovered = await orchestrator.evaluate({
@@ -297,7 +340,14 @@ describe('orchestrator', () => {
 
   it('does not apply validation failures and remains recoverable', async () => {
     const generate = vi.fn(() =>
-      makeGeneratedUI('unsafe-code', 'UnsafeUI'),
+      makeGeneratedUI(
+        `
+function UnsafeUI() {
+  return <div>Unsafe</div>;
+}
+`,
+        'UnsafeUI',
+      ),
     );
 
     const apply = vi.fn(() => ({
@@ -341,7 +391,14 @@ describe('orchestrator', () => {
 
   it('treats application failure as failed and protects the current UI', async () => {
     const generate = vi.fn(() =>
-      makeGeneratedUI('valid-code', 'ValidUI'),
+      makeGeneratedUI(
+        `
+function ValidUI() {
+  return <div>Valid</div>;
+}
+`,
+        'ValidUI',
+      ),
     );
 
     const apply = vi.fn(() => {
@@ -380,7 +437,10 @@ describe('orchestrator', () => {
             }),
         )
         .mockImplementationOnce(() =>
-          makeGeneratedUI('new-code', 'NewUI'),
+          makeGeneratedUI(
+            VALID_NEW_COMPONENT_CODE,
+            'NewUI',
+          ),
         );
 
       const apply = vi.fn();
@@ -405,14 +465,22 @@ describe('orchestrator', () => {
         score: 0.91,
       });
 
-      finishOld(makeGeneratedUI('old-code', 'OldUI'));
+      finishOld(
+        makeGeneratedUI(
+          VALID_OLD_COMPONENT_CODE,
+          'OldUI',
+        ),
+      );
 
       const result = await newRequest;
 
       expect(result.status).toBe('adaptation_complete');
       expect(apply).toHaveBeenCalledTimes(1);
       expect(apply).toHaveBeenCalledWith(
-        makeGeneratedUI('new-code', 'NewUI'),
+        makeGeneratedUI(
+          VALID_NEW_COMPONENT_CODE,
+          'NewUI',
+        ),
         {},
       );
     } finally {
