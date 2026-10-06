@@ -11,6 +11,8 @@
     "start:ws": "tsx backend/websocket/server.ts"
   },
   "dependencies": {
+    "dotenv": "^18.0.4",
+    "groq-sdk": "^1.6.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "ws": "^8.18.0"
