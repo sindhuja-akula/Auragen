@@ -18,20 +18,34 @@ export function AdaptiveForm() {
   const emailRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
   const submitRef = useRef<HTMLButtonElement>(null);
+  const stateManagerRef = useRef<StateManager>(new StateManager());
+
+  // Capture current field values before the UI changes, so nothing
+  // the user already typed gets lost when an adaptation happens.
+  const captureCurrentState = () => {
+    stateManagerRef.current.setState({
+      name: nameRef.current?.value ?? '',
+      email: emailRef.current?.value ?? '',
+      phone: phoneRef.current?.value ?? '',
+    });
+  };
 
   useEffect(() => {
     const client = new TelemetryWebSocketClient();
-    const stateManager = new StateManager();
+    const stateManager = stateManagerRef.current;
     const tracker = new DomTelemetryTracker(client);
 
     const handleAdaptation = createAdaptationHandler(stateManager, {
-      onStarted: () => setIsAdapting(true),
+      onStarted: () => {
+        captureCurrentState();
+        setIsAdapting(true);
+      },
       onResult: (tree) => {
         setIsAdapting(false);
         setGeneratedTree(tree);
       },
       onFailed: () => {
-        // per contract: keep the current UI as it is
+        // per contract: keep the current UI as it is, state is untouched
         setIsAdapting(false);
       },
     });
@@ -53,6 +67,17 @@ export function AdaptiveForm() {
       client.close();
     };
   }, []);
+
+  // Once the fields exist again after returning from a generated view,
+  // put the previously captured values back.
+  useEffect(() => {
+    if (!generatedTree) {
+      const saved = stateManagerRef.current.getState();
+      if (nameRef.current && typeof saved.name === 'string') nameRef.current.value = saved.name;
+      if (emailRef.current && typeof saved.email === 'string') emailRef.current.value = saved.email;
+      if (phoneRef.current && typeof saved.phone === 'string') phoneRef.current.value = saved.phone;
+    }
+  }, [generatedTree]);
 
   if (generatedTree) {
     return <DynamicRenderer tree={generatedTree} />;
