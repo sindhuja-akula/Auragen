@@ -58,8 +58,6 @@ export class TelemetryWebSocketClient {
     });
 
     socket.addEventListener('message', (event) => this.handleIncoming(event));
-
-    // an error is always followed by a close event, reconnect is handled there
     socket.addEventListener('error', () => {
       console.warn('[WS] Connection error');
     });
@@ -111,7 +109,6 @@ export class TelemetryWebSocketClient {
     this.statusHandlers.forEach((handler) => handler(next));
   }
 
-  /** Called for redesign_started / redesign_result / redesign_failed. */
   onServerMessage(handler: ServerMessageHandler): void {
     this.messageHandlers.push(handler);
   }
@@ -124,7 +121,6 @@ export class TelemetryWebSocketClient {
     return this.status;
   }
 
-  /** Returns false (instead of throwing) if the socket is not open. */
   send(event: TelemetryEvent): boolean {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       return false;
@@ -133,7 +129,6 @@ export class TelemetryWebSocketClient {
     return true;
   }
 
-  /** Manual testing only, not used in the real flow. */
   sendTestTelemetry(): boolean {
     const event = this.collector.collect('click', 'submit-button');
     return this.send(event);

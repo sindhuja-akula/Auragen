@@ -4,11 +4,13 @@ export type RawFieldMetrics = {
   time_spent_ms: number;
   error_count: number;
   focus_switches: number;
+  repeated_clicks: number;
 };
 
 const HESITATION_THRESHOLD_MS = 8000;
 const REPEATED_ERROR_THRESHOLD = 2;
 const REPEATED_FOCUS_THRESHOLD = 3;
+const REPEATED_CLICK_THRESHOLD = 3;
 
 export function detectSignals(metrics: RawFieldMetrics): Signal[] {
   const signals: Signal[] = [];
@@ -23,6 +25,10 @@ export function detectSignals(metrics: RawFieldMetrics): Signal[] {
 
   if (metrics.focus_switches >= REPEATED_FOCUS_THRESHOLD) {
     signals.push(createSignal('repeated_focus_switch', metrics.focus_switches));
+  }
+
+  if (metrics.repeated_clicks >= REPEATED_CLICK_THRESHOLD) {
+    signals.push(createSignal('repeated_clicks', metrics.repeated_clicks));
   }
 
   return signals;

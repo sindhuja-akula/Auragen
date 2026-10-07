@@ -12,8 +12,6 @@ type FieldTrackingState = {
   emittedSignals: Set<string>;
 };
 
-// Signals found on the frontend are reported as observations only.
-// Scoring and the decision to adapt happen in the backend (Member 1).
 const SIGNAL_TO_EVENT: Record<string, string> = {
   long_hesitation: telemetryEvents.longHesitation,
   repeated_errors: telemetryEvents.failedAttempt,
@@ -22,7 +20,6 @@ const SIGNAL_TO_EVENT: Record<string, string> = {
 
 const REPEATED_CLICK_COUNT = 3;
 const REPEATED_CLICK_WINDOW_MS = 2000;
-// after one repeated_click is reported, stay quiet on that element for a while
 const REPEATED_CLICK_COOLDOWN_MS = 5000;
 
 export class DomTelemetryTracker {
@@ -53,7 +50,6 @@ export class DomTelemetryTracker {
     return state;
   }
 
-  /** Track one form input. Returns a function that removes the listeners. */
   attach(input: HTMLInputElement): () => void {
     const elementId = input.id || input.name;
     const state = this.getOrInitState(elementId);
@@ -83,7 +79,6 @@ export class DomTelemetryTracker {
     };
   }
 
-  /** Track repeated clicks on a button (e.g. submit). */
   attachClickTracking(button: HTMLElement): () => void {
     const elementId = button.id || 'unknown-button';
 
@@ -97,8 +92,6 @@ export class DomTelemetryTracker {
 
       if (recent.length < REPEATED_CLICK_COUNT) return;
 
-      // Already reported a burst on this element recently: stay quiet,
-      // otherwise someone hammering the button floods the backend.
       const lastReport = this.lastClickReport.get(elementId) ?? 0;
       if (now - lastReport < REPEATED_CLICK_COOLDOWN_MS) return;
 
@@ -122,6 +115,7 @@ export class DomTelemetryTracker {
       time_spent_ms: state.timeSpentMs,
       error_count: state.errorCount,
       focus_switches: state.focusSwitches,
+      repeated_clicks: 0,
     });
 
     for (const signal of signals) {
@@ -137,7 +131,6 @@ export class DomTelemetryTracker {
         focus_switches: state.focusSwitches,
       });
 
-      // only mark as reported if it actually went out, so it can retry later
       if (sent) state.emittedSignals.add(signal.name);
     }
   }
