@@ -1,3 +1,7 @@
+if (typeof window !== 'undefined' && !(window as any).process) {
+  (window as any).process = { env: {} };
+}
+
 import { createRoot } from 'react-dom/client';
 import { AdaptiveForm } from './AdaptiveForm.js';
 

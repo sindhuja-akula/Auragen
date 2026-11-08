@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.ts",
+    "dev": "npm run dev:frontend",
     "dev:frontend": "vite",
+    "dev:backend": "tsx backend/websocket/server.ts",
     "build": "tsc -p tsconfig.json",
     "test": "vitest run --root .",
+    "start": "tsx backend/websocket/server.ts",
     "start:ws": "tsx backend/websocket/server.ts"
   },
   "dependencies": {

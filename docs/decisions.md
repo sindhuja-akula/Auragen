@@ -42,3 +42,14 @@ D37	Boundary ports	Inject validation and application ports into M1 while keeping
 D38	Shared contract authority	Freeze the six contracts under shared/contracts as the single source of truth	Prevents field and semantic drift between M1, M2, M3, and M4; future changes require coordinated Team Lead review.
 D39	Validation decision field	Use valid as the canonical ValidationResult success field and remove ok	Two competing booleans could contradict each other; M1 and M4 now share one decision.
 D40	Generated UI boundary	M3 returns GeneratedUI and M4 consumes it; M1 reports componentName rather than source code	Keeps generated source in GeneratedUI.code and preserves AdaptationResult.component as an identifier.
+
+## Post-Takeover Decisions (Engineering Audit)
+
+D41	Dynamic rendering security	Controlled closure with shadowed globals, NOT raw eval/new Function	After AST validation and JSX-to-createElement compilation, code runs in a function scope where `window`, `document`, `globalThis`, `fetch`, etc. are shadowed as `undefined`. This provides defense-in-depth beyond static AST validation.
+D42	JSX compilation approach	Babel AST traversal to React.createElement	Custom AST traversal replaces JSX syntax with React.createElement calls. This avoids depending on a full bundler or runtime transpiler and keeps the compilation step auditable and deterministic.
+D43	LLM prompt hardening	Explicit component capability list in system prompt	The system prompt includes an explicit allowedComponents list and explicitly bans non-existent packages. This reduces hallucinated imports and guides the model to produce valid, restrictable output.
+D44	JSON extraction from LLM	Strip code fences globally + extract outermost braces	The model sometimes wraps JSON in markdown code fences or surrounds it with conversational text. The `extractJson` helper handles both cases with a bounded retry for unicode escape sanitization.
+D45	max_tokens increase	2048 → 4096	Prevents truncated JSON responses from the LLM, which was a primary cause of parse failures. The model (gpt-oss-20b) generates medium-sized React components that sometimes exceed 2048 tokens.
+D46	Error boundary pattern	React error boundary component wrapping DynamicRenderer	Runtime errors in LLM-generated components (e.g., TypeError on undefined prop) are caught and the system reverts to the last safe UI. The user never sees a blank screen.
+D47	WebSocket bidirectional transport	Server sends cognitive_score, redesign_started, redesign_result, redesign_failed	The frontend receives real-time pipeline status updates for the cognitive score gauge and pipeline stepper visualization, not just the final result.
+D48	Package.json dev script	Alias dev → dev:frontend, add dev:backend	The original `dev` script referenced a non-existent `src/index.ts`. Now `npm run dev` starts the Vite frontend, and `npm run dev:backend` starts the WebSocket server.

@@ -12,7 +12,7 @@ export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 type ServerMessageHandler = (message: ServerMessage) => void;
 type StatusHandler = (status: ConnectionStatus) => void;
 
-const SERVER_MESSAGE_TYPES = ['redesign_started', 'redesign_result', 'redesign_failed'];
+const SERVER_MESSAGE_TYPES = ['redesign_started', 'redesign_result', 'redesign_failed', 'cognitive_score'];
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 15000;
 

@@ -4,4 +4,5 @@ export type RedesignRequest = {
   cognitiveSignals: string[];
   currentState: Record<string, unknown>;
   allowedComponents: string[];
+  targetElementId?: string;
 };

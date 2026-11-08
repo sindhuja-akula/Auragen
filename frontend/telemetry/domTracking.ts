@@ -31,6 +31,7 @@ export class DomTelemetryTracker {
   constructor(
     private readonly client: TelemetryWebSocketClient,
     sessionId: string = getSessionId(),
+    private readonly getState?: () => Record<string, unknown>,
   ) {
     this.collector = new TelemetryCollector(sessionId);
   }
@@ -140,7 +141,11 @@ export class DomTelemetryTracker {
     elementId: string,
     metadata: Record<string, unknown>,
   ): boolean {
-    const event = this.collector.collect(eventType, elementId, metadata);
+    const enrichedMetadata = {
+      ...metadata,
+      ...(this.getState ? { formState: this.getState() } : {}),
+    };
+    const event = this.collector.collect(eventType, elementId, enrichedMetadata);
     const sent = this.client.send(event);
     if (!sent) {
       console.debug(`[Telemetry] not sent (socket not open): ${eventType} on ${elementId}`);

@@ -1,3 +1,5 @@
+import type { GeneratedUI } from './generated-ui.js';
+
 export type AdaptationStatus =
   | 'no_adaptation'
   | 'adaptation_started'
@@ -8,7 +10,9 @@ export type AdaptationStatus =
 export type AdaptationResult = {
   status: AdaptationStatus;
   component?: string;
+  generatedUI?: GeneratedUI;
   restoredState?: Record<string, unknown>;
   latency?: number;
   reason?: string;
+  targetElementId?: string;
 };

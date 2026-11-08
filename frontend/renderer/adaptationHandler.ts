@@ -5,6 +5,7 @@ export type AdaptationCallbacks = {
   onStarted?: (payload: unknown) => void;
   onResult?: (tree: unknown) => void;
   onFailed?: (payload: unknown) => void;
+  onCognitiveScore?: (payload: unknown) => void;
 };
 
 export function createAdaptationHandler(
@@ -24,6 +25,10 @@ export function createAdaptationHandler(
       case 'redesign_failed':
         console.warn('[Adaptation] redesign_failed, keeping current UI:', message.payload);
         callbacks.onFailed?.(message.payload);
+        break;
+
+      case 'cognitive_score':
+        callbacks.onCognitiveScore?.(message.payload);
         break;
 
       default:

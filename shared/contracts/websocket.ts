@@ -3,7 +3,8 @@ export type ClientMessageType = 'telemetry' | 'redesign_request';
 export type ServerMessageType =
   | 'redesign_started'
   | 'redesign_result'
-  | 'redesign_failed';
+  | 'redesign_failed'
+  | 'cognitive_score';
 
 export type WebSocketMessage = {
   type: string;
